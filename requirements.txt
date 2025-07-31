@@ -1,4 +1,7 @@
-fastapi
-uvicorn
-gunicorn
-google-cloud-firestore
+flask
+flask-cors
+firebase-admin
+requests
+beautifulsoup4
+waitress
+gunicorn  # optional (not used now, but safe to keep)
