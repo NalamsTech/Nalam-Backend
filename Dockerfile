@@ -1,18 +1,20 @@
-# Use the official Python image as a base
+# Use a lightweight Python 3.11 image as the base
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
+# Copy and install core dependencies from the root requirements.txt
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the entire project directory into the container
 COPY . .
 
-# Expose the port that Waitress is running on
-EXPOSE 8080
+# Copy and install dependencies from the 'functions' directory
+# The path must be relative to the WORKDIR
+COPY functions/requirements.txt ./functions/
+RUN pip install --no-cache-dir -r ./functions/requirements.txt
 
-# Define the command to run your application
-CMD ["waitress-serve", "--host=0.0.0.0", "--port=8080", "app:app"]
+# Use Gunicorn to run the app, binding to the port provided by Cloud Run
+CMD gunicorn --bind "0.0.0.0:${PORT}" app:app

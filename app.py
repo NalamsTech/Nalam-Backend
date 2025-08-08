@@ -22,14 +22,14 @@ CORS(app)
 
 # --- CONFIGURATION ---
 NALAM_FOODS_URL = "https://nalamfoodsusa.com"
-FIREBASE_CRED_FILE = "nalam-invoice-firebase-adminsdk-fbsvc-ad832e16ff.json"
+FIREBASE_CRED_FILE = "nalam-invoice-1-firebase-adminsdk-fbsvc-e687c97f65.json"
 current_directory = os.path.dirname(os.path.abspath(__file__))
 firebase_cred_path = os.path.join(current_directory, FIREBASE_CRED_FILE)
 
 # Configure your Gemini API key here
 # Replace "YOUR_GEMINI_API_KEY" with your actual API key.
 # You can get one from https://makersuite.google.com/
-genai.configure(api_key="AIzaSyAZSbiRBUaRvkBMvXoxFTcfThQ6vjgGDw8") # Replace with your actual API key
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
 # --- Firebase Service ---
@@ -1032,6 +1032,7 @@ def analyze_invoices_for_import():
         print(f"Error during invoice import analysis: {e}")
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/invoices/import/confirm', methods=['POST'])
 def confirm_import_invoices():
     if db is None:
@@ -1047,14 +1048,12 @@ def confirm_import_invoices():
     imported_invoices_count = 0
     for item in invoices_to_save:
         invoice_data = item.get('invoice')
-        customer_data = item.get('customer') # Customer data is here, but saving is handled by separate endpoint
-
+        
         if not invoice_data or invoice_data.get('_status') == 'skipped':
-            continue # Skip if invoice data is missing or marked skipped from analysis
+            continue
 
-        # Handle new invoice number generation if it's a new invoice
         if invoice_data.get('_status') == 'new':
-            invoice_date_obj = datetime.datetime.now() # Default to now
+            invoice_date_obj = datetime.datetime.now()
             if 'invoiceDate' in invoice_data and isinstance(invoice_data['invoiceDate'], str):
                 try:
                     invoice_date_obj = datetime.datetime.fromisoformat(invoice_data['invoiceDate'].replace('Z', '+00:00'))
@@ -1063,46 +1062,37 @@ def confirm_import_invoices():
             
             new_invoice_number = generate_unique_invoice_number(invoice_date_obj)
             invoice_data['invoiceNumber'] = new_invoice_number
-            invoice_data['invoiceDatePrefix'] = invoice_date_obj.strftime("%Y%m%d") # Set prefix for new invoices
-        
-        # Ensure dates are datetime objects for internal processing, then convert to ISO string for Firestore
-        # invoiceDate
+            invoice_data['invoiceDatePrefix'] = invoice_date_obj.strftime("%Y%m%d")
+
         if 'invoiceDate' in invoice_data:
             if isinstance(invoice_data['invoiceDate'], str):
                 try:
                     invoice_data['invoiceDate'] = datetime.datetime.fromisoformat(invoice_data['invoiceDate'].replace('Z', '+00:00'))
                 except ValueError:
-                    invoice_data['invoiceDate'] = datetime.datetime.now() # Fallback
-            # After parsing to datetime, convert back to ISO string for saving
+                    invoice_data['invoiceDate'] = datetime.datetime.now()
             if isinstance(invoice_data['invoiceDate'], datetime.datetime):
                 invoice_data['invoiceDate'] = invoice_data['invoiceDate'].isoformat()
-        else: # Ensure invoiceDate is always present and in string format
+        else:
             invoice_data['invoiceDate'] = datetime.datetime.now().isoformat()
 
-
-        # dueDate
         if 'dueDate' in invoice_data:
             if isinstance(invoice_data['dueDate'], str):
                 try:
                     invoice_data['dueDate'] = datetime.datetime.fromisoformat(invoice_data['dueDate'].replace('Z', '+00:00'))
                 except ValueError:
-                    invoice_data['dueDate'] = datetime.datetime.now() # Fallback
-            # After parsing to datetime, convert back to ISO string for saving
+                    invoice_data['dueDate'] = datetime.datetime.now()
             if isinstance(invoice_data['dueDate'], datetime.datetime):
                 invoice_data['dueDate'] = invoice_data['dueDate'].isoformat()
-        else: # Ensure dueDate is always present and in string format
+        else:
             invoice_data['dueDate'] = (datetime.datetime.now() + datetime.timedelta(days=invoice_data.get('daysDue', 1))).isoformat()
 
-
-        # Ensure numeric fields are numbers
         for key in ['totalAmount', 'invoiceTaxPercentage', 'invoiceShippingCost', 'invoiceDiscountPercentage', 'totalPaid']:
             if key in invoice_data and not isinstance(invoice_data[key], (int, float)):
                 try:
                     invoice_data[key] = float(invoice_data[key])
                 except (ValueError, TypeError):
-                    invoice_data[key] = 0.0 # Default to 0.0 if conversion fails
+                    invoice_data[key] = 0.0
 
-        # Ensure payments are correctly formatted
         if 'payments' in invoice_data and isinstance(invoice_data['payments'], list):
             for payment in invoice_data['payments']:
                 if 'date' in payment:
@@ -1110,79 +1100,38 @@ def confirm_import_invoices():
                         try:
                             payment['date'] = datetime.datetime.fromisoformat(payment['date'].replace('Z', '+00:00'))
                         except ValueError:
-                            payment['date'] = datetime.datetime.now() # Fallback
-                    # After parsing to datetime, convert back to ISO string for saving
+                            payment['date'] = datetime.datetime.now()
                     if isinstance(payment['date'], datetime.datetime):
                         payment['date'] = payment['date'].isoformat()
-                else: # Ensure payment date is always present and in string format
+                else:
                     payment['date'] = datetime.datetime.now().isoformat()
 
                 if 'amount' in payment and not isinstance(payment['amount'], (int, float)):
                     try:
                         payment['amount'] = float(payment['amount'])
                     except (ValueError, TypeError):
-                        payment['amount'] = 0.0 # Default to 0.0
+                        payment['amount'] = 0.0
 
-
-        # Remove temporary status field
-        invoice_data.pop('_status', None) 
+        invoice_data.pop('_status', None)
         
-        # Save invoice to Firestore
         invoice_ref = db.collection('invoices').document(invoice_data['invoiceNumber'])
         invoice_ref.set(invoice_data, merge=True)
         imported_invoices_count += 1
-
+    
     return jsonify({"message": f"Successfully imported {imported_invoices_count} invoices."}), 200
 
 
-# @app.route('/settings', methods=['GET', 'POST']) # MODIFIED: Allow POST requests
-# def get_settings():
-#     if db is None:
-#         print("Error: Firestore not initialized in get_settings.")
-#         return jsonify({"error": "Firestore not initialized"}), 500
-
-#     settings_doc_ref = db.collection('settings').document('company_profile')
-
-#     if request.method == 'GET':
-#         try:
-#             settings_doc = settings_doc_ref.get()
-#             if settings_doc.exists:
-#                 settings_data = settings_doc.to_dict()
-#                 print("Company settings fetched successfully.")
-#                 return jsonify(settings_data), 200
-#             else:
-#                 # Create a default document if it doesn't exist
-#                 default_settings = {
-#                     "companyName": "NALAM FOODS USA",
-#                     "address": "123 Main St, Anytown, USA",
-#                     "registrationNumber": "",
-#                     "paymentTypes": ["Cash", "Credit Card"],
-#                     "themeName": "Green",
-#                     "email": "nalamfoodsllc@gmail.com",
-#                     "website": "nalamfoodsusa.com",
-#                     "taxPercentage": 0.0,
-#                     "shippingCost": 0.0,
-#                     "discountPercentage": 0.0,
-#                     "defaultInvoiceType": "Invoice",
-#                     "daysDue": 30
-#                 }
-#                 settings_doc_ref.set(default_settings)
-#                 print("Company settings document not found. A default document was created.")
-#                 return jsonify(default_settings), 200
-#         except Exception as e:
-#             print(f"Error fetching settings: {e}")
-#             return jsonify({"error": str(e)}), 500
+def generate_unique_invoice_number(invoice_date_obj):
+    if db is None:
+        # It's good practice to raise an exception if db is not initialized
+        raise Exception("Firestore not initialized.")
     
-#     elif request.method == 'POST':
-#         try:
-#             settings_data = request.get_json()
-#             # You might want to validate the incoming settings_data here
-#             settings_doc_ref.set(settings_data, merge=True) # Use merge=True to update existing fields
-#             print("Company settings saved successfully.")
-#             return jsonify({"message": "Settings saved successfully"}), 200
-#         except Exception as e:
-#             print(f"Error saving settings: {e}")
-#             return jsonify({"error": str(e)}), 500
+    today_str = invoice_date_obj.strftime("%Y%m%d")
+    invoices_today_docs = db.collection('invoices').where(filter=firestore.FieldFilter('invoiceDatePrefix', '==', today_str)).get()
+    count_today = len(invoices_today_docs)
+    invoice_suffix = str(count_today + 1).zfill(3)
+    return f"{today_str}{invoice_suffix}"
+
 
 
 if __name__ == '__main__':

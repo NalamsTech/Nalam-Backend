@@ -1,21 +1,16 @@
-# Welcome to Cloud Functions for Firebase for Python!
-# To get started, simply uncomment the below code or create your own.
-# Deploy with `firebase deploy`
+from app import app
+from flask import Flask, jsonify, request
+import functions_framework
 
-from firebase_functions import https_fn
-from firebase_functions.options import set_global_options
-from firebase_admin import initialize_app
+# The Flask application 'app' is imported from your app.py file.
+# It is now ready to be served by the functions-framework.
 
-# For cost control, you can set the maximum number of containers that can be
-# running at the same time. This helps mitigate the impact of unexpected
-# traffic spikes by instead downgrading performance. This limit is a per-function
-# limit. You can override the limit for each function using the max_instances
-# parameter in the decorator, e.g. @https_fn.on_request(max_instances=5).
-set_global_options(max_instances=10)
-
-# initialize_app()
-#
-#
-# @https_fn.on_request()
-# def on_request_example(req: https_fn.Request) -> https_fn.Response:
-#     return https_fn.Response("Hello world!")
+# This function acts as the entry point for your Cloud Function.
+@functions_framework.http
+def nalam_backend_api(request):
+    """
+    HTTP Cloud Function entry point that proxies requests to the Flask app.
+    """
+    # The functions-framework expects a standard WSGI application.
+    # The Flask app instance 'app' is already a WSGI callable.
+    return app(request.environ, lambda *args, **kwargs: None)
