@@ -7,3 +7,4 @@ waitress
 gunicorn
 python-dotenv
 google-generativeai
+pypdf
