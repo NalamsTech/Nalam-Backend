@@ -211,5 +211,5 @@ __marimo__/
 venv/
 
 # Sensitive files
-*.env
-# *.json
+.env
+*.json

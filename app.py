@@ -44,8 +44,9 @@ def initialize_firebase_app():
         return _firebase_app_instance
 
     try:
-        cred = credentials.Certificate(firebase_cred_path)
-        _firebase_app_instance = firebase_admin.initialize_app(cred)
+        # cred = credentials.Certificate(firebase_cred_path)
+        # On Google Cloud, the SDK automatically finds the service account credentials.
+        _firebase_app_instance = firebase_admin.initialize_app()
         print("Firebase Admin App initialized successfully!")
         return _firebase_app_instance
     except Exception as e:
