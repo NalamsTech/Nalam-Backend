@@ -212,4 +212,4 @@ venv/
 
 # Sensitive files
 *.env
-*.json
+# *.json

@@ -7,6 +7,9 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import os
+if os.path.exists(".env"):
+    from dotenv import load_dotenv
+    load_dotenv()
 import threading
 import time
 import json
@@ -16,20 +19,18 @@ import uuid
 import base64
 from pypdf import PdfReader
 import io
+from config import Config
 
 app = Flask(__name__)
 CORS(app)
 
-# --- CONFIGURATION ---
-NALAM_FOODS_URL = "https://nalamfoodsusa.com"
-FIREBASE_CRED_FILE = "nalam-invoice-1-firebase-adminsdk-fbsvc-e687c97f65.json"
-current_directory = os.path.dirname(os.path.abspath(__file__))
-firebase_cred_path = os.path.join(current_directory, FIREBASE_CRED_FILE)
+app.config.from_object(Config)
+NALAM_FOODS_URL = app.config['NALAM_FOODS_URL']
+FIREBASE_CRED_FILE = app.config['FIREBASE_CRED_FILE']
+firebase_cred_path = FIREBASE_CRED_FILE
 
 # Configure your Gemini API key here
-# Replace "YOUR_GEMINI_API_KEY" with your actual API key.
-# You can get one from https://makersuite.google.com/
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+genai.configure(api_key=app.config['GEMINI_API_KEY'])
 
 
 # --- Firebase Service ---
@@ -48,19 +49,34 @@ def initialize_firebase_app():
         print("Firebase Admin App initialized successfully!")
         return _firebase_app_instance
     except Exception as e:
+        import traceback
+        print("!!!!!!!!!! DETAILED FIREBASE INITIALIZATION ERROR !!!!!!!!!!!")
         print(f"Error initializing Firebase Admin App: {e}")
         print(f"Please ensure '{FIREBASE_CRED_FILE}' is in the correct directory and is valid.")
-        _firebase_app_app_instance = None
-        return None
+        traceback.print_exc()
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        _firebase_app_instance = None
+        raise e
 
+# CORRECTED INITIALIZATION BLOCK:
 try:
     firebase_admin_app = initialize_firebase_app()
     if firebase_admin_app:
         db = firestore.client(firebase_admin_app)
         print("Firestore client initialized and ready.")
+    else:
+        raise Exception("Firebase Admin App failed to initialize and returned None.")
 except Exception as e:
-    print(f"Error getting Firestore client: {e}")
+    print(f"Error initializing Firebase: {e}")
     db = None
+    import traceback
+    print("!!!!!!!!!! APPLICATION FAILED TO START !!!!!!!!!!!")
+    print(f"A critical error occurred during startup: {e}")
+    traceback.print_exc()
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    # Re-raise the exception to ensure app fails clearly
+    raise e
+
 
 
 # --- Models ---
@@ -209,7 +225,15 @@ def start_scheduler():
         time.sleep(3600)
         synchronize_products()
 
-threading.Thread(target=start_scheduler, daemon=True).start()
+
+
+# threading.Thread(target=start_scheduler, daemon=True).start()
+
+
+@app.route('/healthz')
+def healthz():
+    """A simple health check endpoint."""
+    return "OK", 200
 
 
 # --- Product Routes (Integrated directly into app.py) ---
@@ -1136,3 +1160,6 @@ def generate_unique_invoice_number(invoice_date_obj):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)
+
+
+

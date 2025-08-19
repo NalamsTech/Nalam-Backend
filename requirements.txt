@@ -4,4 +4,6 @@ firebase-admin
 requests
 beautifulsoup4
 waitress
-gunicorn  # optional (not used now, but safe to keep)
+gunicorn
+python-dotenv
+google-generativeai

@@ -1,0 +1,46 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: nalambackend
+spec:
+  template:
+    metadata:
+      # This annotation is good practice
+      annotations:
+        run.googleapis.com/launch-stage: BETA
+    spec:
+      # This is the service account we gave permissions to
+      serviceAccountName: 990897329269-compute@developer.gserviceaccount.com
+      containers:
+        # The image will be built from your source code
+        - image: us-east4-docker.pkg.dev/nalam-invoice-1/nalam-backend-repo/nalambackend-image:latest
+          command: ["gunicorn", "app:app", "--bind", ":8080", "--workers", "1", "--threads", "8", "--timeout", "0"]
+          env:
+            # Environment variable for the Firebase credentials path
+            - name: FIREBASE_CRED_FILE
+              value: /secrets/firebase-key.json
+            # Environment variable for the Gemini API Key from Secret Manager
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: GEMINI_API_KEY_SECRET
+                  key: 'latest'
+          # Mounts the secret volume into the container
+          volumeMounts:
+            - name: firebase-sa-key-volume
+              mountPath: /secrets
+              readOnly: true
+          # Defines the startup probe with a corrected timeout
+          startupProbe:
+            timeoutSeconds: 10
+            periodSeconds: 60
+            failureThreshold: 3
+            tcpSocket: {}
+      # Defines the volume that gets data from Secret Manager
+      volumes:
+        - name: firebase-sa-key-volume
+          secret:
+            secretName: FIREBASE_SA_KEY_SECRET
+            items:
+              - key: 'latest'
+                path: firebase-key.json
