@@ -642,7 +642,8 @@ def analyze_customers_for_import():
                         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
                         HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-                    }
+                    },
+                    request_options={"timeout": 300} # Add this line
                 )
                 
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
@@ -946,6 +947,7 @@ def analyze_invoices_for_import():
                         HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                     }
+                    request_options={"timeout": 300} # Add this line
                 )
                 
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
