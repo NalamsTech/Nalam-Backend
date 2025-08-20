@@ -590,7 +590,7 @@ def analyze_customers_for_import():
 
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-preview-05-20"
+            model_name="gemini-1.5-flash-latest"
         )
         
         customer_schema = {
@@ -825,7 +825,7 @@ def analyze_invoices_for_import():
 
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-preview-05-20"
+            model_name="gemini-1.5-flash-latest"
         )
         
         # Define the desired JSON schema for invoice and customer data
